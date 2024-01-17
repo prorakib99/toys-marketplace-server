@@ -25,13 +25,19 @@ async function run() {
         await client.connect();
 
         const toysCollection = client.db('toysMarket').collection('toys');
+        const categoriesCollection = client.db('toysMarket').collection('categories');
 
         app.get('/toys', async (req, res) => {
             const result = await toysCollection.find().toArray();
             res.send(result);
         });
 
-        app.get('/category/:id', async (req, res) => {
+        app.get('/categories', async (req, res) => {
+            const result = await categoriesCollection.find().toArray();
+            res.send(result);
+        });
+
+        app.get('/categories/:id', async (req, res) => {
             const id = req.params.id;
             const query = { categoryID: parseInt(id) };
             const result = await toysCollection.find(query).toArray();
