@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const jwt = require('jsonwebtoken');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 5000;
@@ -20,6 +21,22 @@ const client = new MongoClient(uri, {
         deprecationErrors: true
     }
 });
+
+const verifyJWT = (req, res, next) => {
+    const authorization = req.headers.authorization;
+    if (!authorization) {
+        return res.status(401).send({ error: true, message: 'unauthorized access' });
+    }
+    const token = authorization.split(' ')[1];
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (error, decoded) => {
+        if (error) {
+            return res.status(403).send({ error: true, message: 'unauthorized access' });
+        }
+        req.decoded = decoded;
+        next();
+    });
+};
+
 async function run() {
     try {
         await client.connect();
@@ -27,14 +44,43 @@ async function run() {
         const toysCollection = client.db('toysMarket').collection('toys');
         const categoriesCollection = client.db('toysMarket').collection('categories');
 
-        // app.get('/toys', async (req, res) => {
-        //     const { page, limit } = req.query;
-        //     const pageNumber = parseInt(page) || 1;
-        //     const itemsPerPage = parseInt(limit) || 20;
-        //     const skip = (pageNumber - 1) * itemsPerPage;
-        //     const result = await toysCollection.find().skip(skip).limit(itemsPerPage).toArray();
-        //     res.send(result);
-        // });
+        app.get('/toys', async (req, res) => {
+            // const { page, limit } = req.query;
+            // const pageNumber = parseInt(page) || 1;
+            // const itemsPerPage = parseInt(limit) || 20;
+            // const skip = (pageNumber - 1) * itemsPerPage;
+            const result = await toysCollection.find().toArray();
+            res.send(result);
+        });
+
+        app.post('/jwt', async (req, res) => {
+            const user = req.body;
+            const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+                expiresIn: '1d'
+            });
+            res.send({ token });
+        });
+
+        // User My Toys
+        app.get('/my-toys', verifyJWT, async (req, res) => {
+            const decoded = req.decoded;
+            if (decoded.email !== req.query.email) {
+                return res.status(403).send({ error: 1, message: 'forbidden access' });
+            }
+            let query = {};
+            if (req.query?.email) {
+                query.email = req.query.email;
+            }
+            const result = await toysCollection.find(query).toArray();
+            res.send(result);
+        });
+
+        app.delete('/my-toys/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const result = await toysCollection.deleteOne(query);
+            res.send(result);
+        });
 
         app.post('/toys', async (req, res) => {
             const newToys = req.body;
