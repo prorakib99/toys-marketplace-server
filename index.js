@@ -27,16 +27,51 @@ async function run() {
         const toysCollection = client.db('toysMarket').collection('toys');
         const categoriesCollection = client.db('toysMarket').collection('categories');
 
-        app.get('/toys', async (req, res) => {
-            const result = await toysCollection.find().toArray();
-            res.send(result);
-        });
+        // app.get('/toys', async (req, res) => {
+        //     const { page, limit } = req.query;
+        //     const pageNumber = parseInt(page) || 1;
+        //     const itemsPerPage = parseInt(limit) || 20;
+        //     const skip = (pageNumber - 1) * itemsPerPage;
+        //     const result = await toysCollection.find().skip(skip).limit(itemsPerPage).toArray();
+        //     res.send(result);
+        // });
 
         app.post('/toys', async (req, res) => {
             const newToys = req.body;
-            console.log(newToys);
             const result = await toysCollection.insertOne(newToys);
             res.send(result);
+        });
+
+        // Search
+        app.get('/search', async (req, res) => {
+            const searchTerm = req.query.searchTerm;
+            const page = parseInt(req.query.page) || 1;
+            const pageSize = 20;
+
+            const result = await toysCollection
+                .find({
+                    $or: [
+                        { name: { $regex: searchTerm, $options: 'i' } },
+                        { category: { $regex: searchTerm, $options: 'i' } }
+                    ]
+                })
+                .skip((page - 1) * pageSize)
+                .limit(pageSize)
+                .toArray();
+
+            const totalResults = await toysCollection.countDocuments({
+                $or: [
+                    { name: { $regex: searchTerm, $options: 'i' } },
+                    { category: { $regex: searchTerm, $options: 'i' } }
+                ]
+            });
+
+            res.send({
+                result,
+                totalResults,
+                currentPage: page,
+                totalPages: Math.ceil(totalResults / pageSize)
+            });
         });
 
         app.get('/categories', async (req, res) => {
