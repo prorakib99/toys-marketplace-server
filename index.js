@@ -39,20 +39,38 @@ const verifyJWT = (req, res, next) => {
 
 async function run() {
     try {
-        await client.connect();
+        client.connect();
 
         const toysCollection = client.db('toysMarket').collection('toys');
         const categoriesCollection = client.db('toysMarket').collection('categories');
 
+        // All Toys
         app.get('/toys', async (req, res) => {
-            // const { page, limit } = req.query;
-            // const pageNumber = parseInt(page) || 1;
-            // const itemsPerPage = parseInt(limit) || 20;
-            // const skip = (pageNumber - 1) * itemsPerPage;
             const result = await toysCollection.find().toArray();
             res.send(result);
         });
 
+        // Add Toys
+        app.post('/toys', async (req, res) => {
+            const newToys = req.body;
+            const result = await toysCollection.insertOne(newToys);
+            res.send(result);
+        });
+
+        // Category base load data
+        app.get('/categories', async (req, res) => {
+            const result = await categoriesCollection.find().toArray();
+            res.send(result);
+        });
+
+        app.get('/categories/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { categoryID: parseInt(id) };
+            const result = await toysCollection.find(query).toArray();
+            res.send(result);
+        });
+
+        // JWT Req
         app.post('/jwt', async (req, res) => {
             const user = req.body;
             const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
@@ -82,16 +100,34 @@ async function run() {
             res.send(result);
         });
 
+        app.put('/my-toys/:id', async (req, res) => {
+            const id = req.params.id;
+            const updateToys = req.body;
+            const filter = { _id: new ObjectId(id) };
+            const updateDoc = {
+                $set: {
+                    name: updateToys.name,
+                    price: updateToys.price,
+                    picture: updateToys.picture,
+                    category: updateToys.category,
+                    categoryID: updateToys.categoryID,
+                    seller: updateToys.seller,
+                    email: updateToys.email,
+                    stock: updateToys.stock,
+                    ratings: updateToys.ratings,
+                    description: updateToys.description
+                }
+            };
+            const options = { upsert: true };
+
+            const result = await toysCollection.updateOne(filter, updateDoc, options);
+            res.send(result);
+        });
+
         app.delete('/my-toys/:id', async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) };
             const result = await toysCollection.deleteOne(query);
-            res.send(result);
-        });
-
-        app.post('/toys', async (req, res) => {
-            const newToys = req.body;
-            const result = await toysCollection.insertOne(newToys);
             res.send(result);
         });
 
@@ -125,18 +161,6 @@ async function run() {
                 currentPage: page,
                 totalPages: Math.ceil(totalResults / pageSize)
             });
-        });
-
-        app.get('/categories', async (req, res) => {
-            const result = await categoriesCollection.find().toArray();
-            res.send(result);
-        });
-
-        app.get('/categories/:id', async (req, res) => {
-            const id = req.params.id;
-            const query = { categoryID: parseInt(id) };
-            const result = await toysCollection.find(query).toArray();
-            res.send(result);
         });
 
         await client.db('admin').command({ ping: 1 });
