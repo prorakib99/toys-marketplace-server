@@ -100,8 +100,8 @@ async function run() {
             res.send(result);
         });
 
-        app.put('/my-toys/:id', async (req, res) => {
-            const id = req.params.id;
+        app.patch('/my-toys', async (req, res) => {
+            const { id } = req.query;
             const updateToys = req.body;
             const filter = { _id: new ObjectId(id) };
             const updateDoc = {
